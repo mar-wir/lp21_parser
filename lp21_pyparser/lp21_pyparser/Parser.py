@@ -109,7 +109,7 @@ import mypy
 
 
 ##### get all details for each kompetenz header
-def get_k_details(k_link):
+def get_k_details(k_link: str) -> pd.DataFrame:
 
     main_site = "https://sh.lehrplan.ch/"
     hdr = {"User-Agent": "Mozilla/5.0"}
@@ -137,15 +137,18 @@ def get_k_details(k_link):
     for i in standard_table_row:
 
         for num in range(1, 5):
+            #finds all zyklus, cumbersome because class names
             try:
                 zyk = i.find(
                     class_="tooltip one column komp_cell marker_z" + str(num)
                 ).get("title")
+                #append just the number
                 zyklus.append(int(re.findall(r"\d+", zyk)[0]))
             except:
                 pass
 
         try:
+            #sometimes NoneType, so in try except
             komp_code.append(
                 i.find(
                     class_="tooltip one column komp_cell kompetenz_lit"
@@ -176,7 +179,7 @@ def get_k_details(k_link):
     # put the dot back where it belongs
     kompetenz_text = [[i + "." for i in k] for k in kompetenz_text]
 
-    # buld pands dataframe
+    # build up Pandas dataframe
     row_rep = len(kompetenz_text)  # the info per row will get exploded out
     df = pd.DataFrame()
     df["k_group"] = [kompetenz_group] * row_rep
@@ -189,6 +192,7 @@ def get_k_details(k_link):
     df["qverweis"] = querverweis
     df["qverweis_link"] = querverweis_link
 
+    # spread row attributes to each of its text contents
     df = df.explode("k_text").reset_index(drop=True)
     return df
 
