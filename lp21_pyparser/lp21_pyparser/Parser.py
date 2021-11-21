@@ -3,26 +3,7 @@ from urllib.request import Request, urlopen
 import re
 import pandas as pd
 import mypy
-
-##### Canton Link List
-# site = 'https://www.lehrplan21.ch/'
-#
-# hdr = {'User-Agent': 'Mozilla/5.0'}
-# req = Request(site,headers=hdr)
-# page = urlopen(req)
-# soup = BeautifulSoup(page, features = "lxml")
-# all_a = soup.find_all('a')
-# canton_links=[]
-#
-# for link in all_a:
-#    l = link.get('href')
-#    if type(l) != 'NoneType':
-#        canton_links.append(str(l))
-# links = [k for k in canton_links if '.lehrplan.ch' in k]
-# links = set(links)
-# for i in links:
-#    print(i)
-#
+import pprint
 
 # bla.find('iframe', class_='blabla')['src']
 
@@ -48,64 +29,98 @@ import mypy
 #    print(k)
 
 
-##### Fach Items
-# main_site = 'https://sh.lehrplan.ch/'
-# site = 'https://sh.lehrplan.ch/index.php?code=b|1|0&la=yes'
-# hdr = {'User-Agent': 'Mozilla/5.0'}
-# req = Request(site,headers=hdr)
-# page = urlopen(req)
-# soup = BeautifulSoup(page, features = "lxml")
+
+###### Kompetenz übergruppen Items
+#main_site = 'https://sh.lehrplan.ch/'
+#site = 'https://sh.lehrplan.ch/index.php?code=b|1|11'
+#hdr = {'User-Agent': 'Mozilla/5.0'}
+#req = Request(site,headers=hdr)
+#page = urlopen(req)
+#soup = BeautifulSoup(page, features = "lxml")
 #
-# menu = soup.find_all(class_='dreieck_mit')
+#menu = soup.find_all(class_='dreieck_mit')
 #
-# faecher = dict()
-# for i in menu:
+#faecher = dict()
+#for i in menu:
 #    faecher[str(i.contents[0].string)] = main_site+ i.contents[0].get('href')
 #
-# for i, k in faecher.items():
-#    print(i)
-#    print(k)
-
-##### Kompetenz übergruppen Items
-# main_site = 'https://sh.lehrplan.ch/'
-# site = 'https://sh.lehrplan.ch/index.php?code=b|1|11'
-# hdr = {'User-Agent': 'Mozilla/5.0'}
-# req = Request(site,headers=hdr)
-# page = urlopen(req)
-# soup = BeautifulSoup(page, features = "lxml")
-#
-# menu = soup.find_all(class_='dreieck_mit')
-#
-# faecher = dict()
-# for i in menu:
-#    faecher[str(i.contents[0].string)] = main_site+ i.contents[0].get('href')
-#
-# for i, k in faecher.items():
+#for i, k in faecher.items():
 #    print(i)
 #    print(k)
 
 
-###### get all kompetenzen headers and links for each fach
-# main_site = 'https://sh.lehrplan.ch/'
-# site = 'https://sh.lehrplan.ch/index.php?code=b|1|11'
-# hdr = {'User-Agent': 'Mozilla/5.0'}
-# req = Request(site,headers=hdr)
-# page = urlopen(req)
-# soup = BeautifulSoup(page, features = "lxml")
-#
-# menu = soup.find_all('a')
-#
-# komp_dict = dict()
-# for i in menu:
-#    try:
-#        if 'Die Schülerinnen und Schüler' in i.string:
-#            komp_dict[str(i.string)] = main_site+ i.get('href')
-#    except:
-#        pass
-#
-# for i, k in komp_dict.items():
-#    print(i)
-#    print(k)
+class Parser:
+
+    def __init__(self, canton_of_choice: str = 'sh'):
+
+        self.canton_of_choice = canton_of_choice
+        self.hdr = {"User-Agent": "Mozilla/5.0"}
+        self.main_site = 'https://www.lehrplan21.ch/'
+        self.canton_links = self.get_canton_sites()
+        self.canton_url = [s for s in self.canton_links if self.canton_of_choice in s][0]
+        if self.canton_url == None:
+            raise Exception("No canton link could be found in the canton list with the provided acronym. Check your spelling!")
+
+        self.faecher = self.get_faecher(self.canton_url)
+        #self.my_dictionary = {k: self.get_k_groups(v) for k, v in self.faecher.items()}
+
+
+
+    ##### Canton Link List
+    def get_canton_sites(self):
+        req = Request(self.main_site, headers=self.hdr)
+        page = urlopen(req)
+        soup = BeautifulSoup(page, features = "lxml")
+        all_a = soup.find_all('a')
+        canton_links=[]
+
+        for link in all_a:
+            l = link.get('href')
+            if type(l) != 'NoneType':
+                canton_links.append(str(l).replace('http:', 'https:'))
+        links = [k for k in canton_links if '.lehrplan.ch' in k]
+        return list(set(links)) #return unique entries
+
+    ##### Fach Items
+    def get_faecher(self, f_url: str) -> dict:
+        req = Request(f_url, headers=self.hdr)
+        page = urlopen(req)
+        soup = BeautifulSoup(page, features = "lxml")
+
+        menu = soup.find_all(class_='dreieck_mit')
+
+        faecher = dict()
+        for i in menu:
+            f_link = self.canton_url + '/' + i.contents[0].get('href')
+            level_test = self.get_k_groups(f_link)
+            if not level_test:
+                level_test = self.get_faecher(f_link)
+                faecher[str(i.contents[0].string)] = level_test
+            else:
+                faecher[str(i.contents[0].string)] = f_link
+        if 'Grundlagen' in list(faecher.keys()):
+            del faecher['Grundlagen']
+        return faecher
+
+    #### get all kompetenzen headers and links for each fach
+    def get_k_groups(self, fach: str) -> list:
+        req = Request(fach,headers=self.hdr)
+        page = urlopen(req)
+        soup = BeautifulSoup(page, features = "lxml")
+
+        menu = soup.find_all('a')
+        #komp_dict = dict()
+        komp_dict = []
+        for i in menu:
+            try:
+                if 'Die Schülerinnen und Schüler' in i.string:
+                    #komp_dict[str(i.string)] = self.canton_url + '/' + i.get('href')
+                    komp_dict.append(self.canton_url + '/' + i.get('href'))
+
+            except:
+                pass
+        return komp_dict
+
 
 
 ##### get all details for each kompetenz header
@@ -197,4 +212,7 @@ def get_k_details(k_link: str) -> pd.DataFrame:
     return df
 
 
-print(get_k_details("https://sh.lehrplan.ch/index.php?code=a|1|11|6|3|1"))
+#print(get_k_details("https://sh.lehrplan.ch/index.php?code=a|1|11|6|3|1"))
+aaa = Parser()
+pprint.pprint(aaa.faecher)
+#pprint.pprint(aaa.my_dictionary)

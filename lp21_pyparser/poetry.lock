@@ -169,7 +169,7 @@ python-versions = ">=3.5"
 name = "mypy"
 version = "0.910"
 description = "Optional static typing for Python"
-category = "main"
+category = "dev"
 optional = false
 python-versions = ">=3.5"
 
@@ -186,7 +186,7 @@ python2 = ["typed-ast (>=1.4.0,<1.5.0)"]
 name = "mypy-extensions"
 version = "0.4.3"
 description = "Experimental type system extensions for programs checked with the mypy typechecker."
-category = "main"
+category = "dev"
 optional = false
 python-versions = "*"
 
@@ -381,7 +381,7 @@ python-versions = ">=3.6"
 name = "toml"
 version = "0.10.2"
 description = "Python Library for Tom's Obvious, Minimal Language"
-category = "main"
+category = "dev"
 optional = false
 python-versions = ">=2.6, !=3.0.*, !=3.1.*, !=3.2.*"
 
@@ -397,7 +397,7 @@ python-versions = ">=3.6"
 name = "typing-extensions"
 version = "4.0.0"
 description = "Backported and Experimental Type Hints for Python 3.6+"
-category = "main"
+category = "dev"
 optional = false
 python-versions = ">=3.6"
 
@@ -431,7 +431,7 @@ python-versions = "*"
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.8"
-content-hash = "2de5ff0fe6a1741062c46b5ff1e66f7f83e888e52dec8347d76a8a22080c06d0"
+content-hash = "f96a8e55f9a68ee40d5a531622d98ee717e495edfd9bdf8cb99fb0028623906f"
 
 [metadata.files]
 atomicwrites = [

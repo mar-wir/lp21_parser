@@ -8,13 +8,13 @@ authors = ["Marco Wirthin <marco.wirthlin@gmail.com>"]
 python = "^3.8"
 bs4 = "^0.0.1"
 pandas = "^1.3.4"
-mypy = "^0.910"
 lxml = "^4.6.4"
 
 [tool.poetry.dev-dependencies]
 pytest = "^5.2"
 pre-commit = "^2.15.0"
 black = {version = "^21.11b1", allow-prereleases = true}
+mypy = "^0.910"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
@@ -43,4 +43,3 @@ exclude = '''
                      # the root of the project
 )
 '''
-
