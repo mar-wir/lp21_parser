@@ -23,28 +23,15 @@ class Parser:
             )
 
         self.faecher = self.get_faecher(self.canton_url)
-        #        with open("./faecher.json", "w", encoding="UTF-8") as fp:
-        #            json.dump(
-        #                self.faecher,
-        #                fp,
-        #                sort_keys=True,
-        #                indent=4,
-        #                separators=(",", ": "),
-        #                ensure_ascii=False,
-        #            )
-        self.k_details_dict = self.dictapply(self.faecher, self.get_k_groups)
-        #        with open("./link_dict.json", "w", encoding="UTF-8") as fp:
-        #            json.dump(
-        #                self.k_details_dict,
-        #                fp,
-        #                sort_keys=True,
-        #                indent=4,
-        #                separators=(",", ": "),
-        #                ensure_ascii=False,
-        #            )
 
+        self.k_details_dict = self.dictapply(self.faecher, self.get_k_groups)
+
+        ##flatten the dictionary containing all the links
         norm = pd.json_normalize(self.k_details_dict, sep="_")
         self.k_details_dict = norm.to_dict(orient="records")[0]
+
+        ##apply the function 'combineaply' recursively to each lowest dict level
+        ##combineapply calls the df extraction func and combines all df's
 
         self.k_df_dict = self.dictapply(self.k_details_dict, self.combineapply)
 
@@ -57,6 +44,9 @@ class Parser:
         final_frame = pd.concat(frames, keys=user_ids).reset_index()
         final_frame.to_csv("lp_parse_export.csv")
         print(final_frame)
+
+    #        test = self.get_k_details("https://sh.lehrplan.ch/index.php?code=a|5|0|1|3|2")
+    #        test.to_csv('test.csv')
 
     def w_dict_to_json(
         self, dic: dict, filename: str = "unnamed_dict_export.json"
@@ -203,13 +193,34 @@ class Parser:
         )
         # remove breaks and possible whitespaces
         kompetenz_text = [
-            k.text.strip("\n").strip(" ").replace("z.B.", "zum Beispiel")
+            k.text.strip("\n")
+            .strip(" ")
+            .strip()
+            .replace("z.B.", "zum Beispiel")
+            .replace("z. B.", "zum Beispiel")
+            .replace(". (", " (")
+            .replace(".(", " (")
+            .replace("​", "")
+            .replace("...", "___")
+            .replace("u.a.", "unter anderem")
+            .replace("Fr.", "Fr")
+            .replace("Rp", "Rp")
+            .replace("bzgl.", "bezüglich")
+            .replace("vs.", "versus")
+            .replace("inkl.", "inklusive")
+            .replace("v.a.", "vor allem")
+            .replace("bzw.", "beziehungsweise")
             for k in kompetenz_text
         ]
+
+        kompetenz_text = [re.sub(r"(\d)\.", r"\1,", k) for k in kompetenz_text]
+
         # separate into individual sub kompetenzen by the dot
         kompetenz_text = [k.strip(".").split(".") for k in kompetenz_text]
+
         # put the dot back where it belongs
-        kompetenz_text = [[i + "." for i in k] for k in kompetenz_text]
+        kompetenz_text = [[str(i) + "." for i in k] for k in kompetenz_text]
+
         # build up Pandas dataframe
         row_rep = len(kompetenz_text)  # the info per row will get exploded out
 
