@@ -22,31 +22,34 @@ class Parser:
                 "No canton link could be found in the canton list with the provided acronym. Check your spelling!"
             )
 
-        self.faecher = self.get_faecher(self.canton_url)
+            #        self.faecher = self.get_faecher(self.canton_url)
 
-        self.k_details_dict = self.dictapply(self.faecher, self.get_k_groups)
+            #        self.k_details_dict = self.dictapply(self.faecher, self.get_k_groups)
 
-        ##flatten the dictionary containing all the links
-        norm = pd.json_normalize(self.k_details_dict, sep="_")
-        self.k_details_dict = norm.to_dict(orient="records")[0]
+            ##flatten the dictionary containing all the links
+            #        norm = pd.json_normalize(self.k_details_dict, sep="_")
+            #        self.k_details_dict = norm.to_dict(orient="records")[0]
 
-        ##apply the function 'combineaply' recursively to each lowest dict level
-        ##combineapply calls the df extraction func and combines all df's
+            ##apply the function 'combineaply' recursively to each lowest dict level
+            ##combineapply calls the df extraction func and combines all df's
 
-        self.k_df_dict = self.dictapply(self.k_details_dict, self.combineapply)
+            #        self.k_df_dict = self.dictapply(self.k_details_dict, self.combineapply)
 
-        user_ids = []
-        frames = []
+            #        user_ids = []
+            #        frames = []
 
-        for user_id, d in self.k_df_dict.items():
-            user_ids.append(user_id)
-            frames.append(d)
-        final_frame = pd.concat(frames, keys=user_ids).reset_index()
-        final_frame.to_csv("lp_parse_export.csv")
-        print(final_frame)
+            #        for user_id, d in self.k_df_dict.items():
+            #            user_ids.append(user_id)
+            #            frames.append(d)
+            #        final_frame = pd.concat(frames, keys=user_ids).reset_index()
+            #        final_frame.to_csv("lp_parse_export.csv")
+            #        print(final_frame)
 
-    #        test = self.get_k_details("https://sh.lehrplan.ch/index.php?code=a|5|0|1|3|2")
-    #        test.to_csv('test.csv')
+            test = self.get_k_details(
+                "https://sh.lehrplan.ch/index.php?code=a|5|0|1|3|2"
+            )
+            print(test)
+            test.to_csv("test.csv")
 
     def w_dict_to_json(
         self, dic: dict, filename: str = "unnamed_dict_export.json"
@@ -160,7 +163,7 @@ class Parser:
             if i.find(
                 class_="tooltip eight columns komp_cell kompetenz_text kompetenz_arrow_later"
             ):
-                continue
+                continue  # skip iteration
 
             for num in range(1, 4):
                 # finds all zyklus, cumbersome because class names
@@ -192,6 +195,7 @@ class Parser:
             class_="eight columns komp_cell kompetenz_text"
         )
         # remove breaks and possible whitespaces
+        # as I split on periods, I try to remove excess ones
         kompetenz_text = [
             k.text.strip("\n")
             .strip(" ")
@@ -200,11 +204,11 @@ class Parser:
             .replace("z. B.", "zum Beispiel")
             .replace(". (", " (")
             .replace(".(", " (")
-            .replace("​", "")
+            .replace("​", "")  # strange char
             .replace("...", "___")
             .replace("u.a.", "unter anderem")
             .replace("Fr.", "Fr")
-            .replace("Rp", "Rp")
+            .replace("Rp.", "Rp")
             .replace("bzgl.", "bezüglich")
             .replace("vs.", "versus")
             .replace("inkl.", "inklusive")
@@ -212,10 +216,10 @@ class Parser:
             .replace("bzw.", "beziehungsweise")
             for k in kompetenz_text
         ]
-
+        # find periods preceeded by numbers, sub by comma (german num sep)
         kompetenz_text = [re.sub(r"(\d)\.", r"\1,", k) for k in kompetenz_text]
 
-        # separate into individual sub kompetenzen by the dot
+        # separate into individual sub kompetenzen by the periods, works well
         kompetenz_text = [k.strip(".").split(".") for k in kompetenz_text]
 
         # put the dot back where it belongs
@@ -237,6 +241,54 @@ class Parser:
         # spread row attributes to each of its text contents
         df = df.explode("k_text").reset_index(drop=True)
         return df
+
+    def polish_df(df):
+
+        df["str_criteria"] = df["k_text"].str.contains(
+            "zeigen|stellen|lernen|nehmen|setzen|reflektieren|erkunden|machen|erzählen|erhalten|wissen|entwickeln|verfügen|sind bereit|sammeln|ordnen|erforschen|beschreiben|kennen|experimentieren|erfahren|entscheiden|lassen sich|suchen|erkennen|verwenden|können|Erweiterung|verstehen"
+        )
+
+        df["Index"] = df.index
+        onlyF_df = df.loc[df.str_criteria == False]
+        onlyF_df = onlyF_df[["Index", "k_text"]]
+        onlyT_df = df.loc[df.str_criteria == True]
+        onlyF_df["Index"] = onlyF_df["Index"] - 1
+        result = (
+            pd.merge(onlyT_df, onlyF_df, how="left", on=["Index"])
+            .reset_index()
+            .fillna("")
+        )
+        result["k_text"] = result["k_text_x"] + " " + result["k_text_y"]
+        result[["Fach", "Fach_Detail"]] = result["level_0"].str.split(
+            "_", 1, expand=True
+        )
+        result = result.drop(
+            columns=[
+                "index",
+                "Index",
+                "k_text_x",
+                "k_text_y",
+                "str_criteria",
+                "Unnamed: 0",
+                "level_0",
+                "level_1",
+            ]
+        ).fillna("NA")
+        result = result[
+            [
+                "Fach",
+                "Fach_Detail",
+                "k_group",
+                "k_subgroup",
+                "k_subgroup_code",
+                "k_code",
+                "zyklus",
+                "k_text_code",
+                "qverweis",
+                "k_text",
+            ]
+        ]
+        return result
 
 
 # print(get_k_details("https://sh.lehrplan.ch/index.php?code=a|1|11|6|3|1"))
