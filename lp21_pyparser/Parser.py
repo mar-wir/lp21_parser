@@ -6,6 +6,8 @@ import mypy
 import pprint
 import json
 
+# from rich.progress import Progress
+
 
 class Parser:
     def __init__(self, canton_of_choice: str = "sh"):
@@ -21,35 +23,62 @@ class Parser:
             raise Exception(
                 "No canton link could be found in the canton list with the provided acronym. Check your spelling!"
             )
+        self.get_ueber_k()
 
-            #        self.faecher = self.get_faecher(self.canton_url)
+        #        self.faecher = self.get_faecher(self.canton_url)
+        #
+        #        self.k_details_dict = self.dictapply(self.faecher, self.get_k_groups)
+        #
+        #        ##flatten the dictionary containing all the links
+        #        norm = pd.json_normalize(self.k_details_dict, sep="_")
+        #        self.k_details_dict = norm.to_dict(orient="records")[0]
+        #
+        #        ##apply the function 'combineaply' recursively to each lowest dict level
+        #        ##combineapply calls the df extraction func and combines all df's
+        #
+        #        self.k_df_dict = self.dictapply(self.k_details_dict, self.combineapply)
+        #
+        #        user_ids = []
+        #        frames = []
+        #
+        #        for user_id, d in self.k_df_dict.items():
+        #            user_ids.append(user_id)
+        #            frames.append(d)
+        #        final_frame = pd.concat(frames, keys=user_ids).reset_index()
+        #        polished_df = self.polish_df(final_frame)
+        #
+        #        polished_df.to_csv("lp_parse_export.csv", index=False)
+        #
+        #        print(polished_df)
+        test = self.get_k_details(
+            "https://sh.lehrplan.ch/index.php?code=a|5|0|1|3|2"
+        )
+        print(test)
+        test.to_csv("test.csv", index=False)
 
-            #        self.k_details_dict = self.dictapply(self.faecher, self.get_k_groups)
+    def get_ueber_k(self) -> pd.DataFrame:
+        url = self.canton_url + "/" + "index.php?code=e|200|3"
+        req = Request(url, headers=self.hdr)
+        page = urlopen(req)
+        soup = BeautifulSoup(page, features="lxml")
 
-            ##flatten the dictionary containing all the links
-            #        norm = pd.json_normalize(self.k_details_dict, sep="_")
-            #        self.k_details_dict = norm.to_dict(orient="records")[0]
+        # menu = soup.find_all(class_="marginalie three columns alpha")
+        # [print(i.contents[0].contents[0].find('a').attrs.get('name')) for i in menu]
+        # [print(i.contents[0].text) for i in menu]
+        test = soup.find_all(class_="ek_absatz")
+        # [print(i.contents[0].contents[0].find('a').attrs.get('name')) for i in test]
+        # [print(i.text) for i in test]
+        ueberkomp = dict()
+        for i in test:
+            key = i.contents[0].contents[0].find("a").attrs.get("name")
+            if "11" in key:
+                utext = self.k_text_formatter(i)
+                ueberkomp[key] = utext
+        pprint.pprint(ueberkomp)
 
-            ##apply the function 'combineaply' recursively to each lowest dict level
-            ##combineapply calls the df extraction func and combines all df's
-
-            #        self.k_df_dict = self.dictapply(self.k_details_dict, self.combineapply)
-
-            #        user_ids = []
-            #        frames = []
-
-            #        for user_id, d in self.k_df_dict.items():
-            #            user_ids.append(user_id)
-            #            frames.append(d)
-            #        final_frame = pd.concat(frames, keys=user_ids).reset_index()
-            #        final_frame.to_csv("lp_parse_export.csv")
-            #        print(final_frame)
-
-            test = self.get_k_details(
-                "https://sh.lehrplan.ch/index.php?code=a|5|0|1|3|2"
-            )
-            print(test)
-            test.to_csv("test.csv")
+    #        if "Grundlagen" in list(faecher.keys()):
+    #            del faecher["Grundlagen"]
+    #        return faecher
 
     def w_dict_to_json(
         self, dic: dict, filename: str = "unnamed_dict_export.json"
@@ -194,36 +223,8 @@ class Parser:
         kompetenz_text = soup.find_all(
             class_="eight columns komp_cell kompetenz_text"
         )
-        # remove breaks and possible whitespaces
-        # as I split on periods, I try to remove excess ones
-        kompetenz_text = [
-            k.text.strip("\n")
-            .strip(" ")
-            .strip()
-            .replace("z.B.", "zum Beispiel")
-            .replace("z. B.", "zum Beispiel")
-            .replace(". (", " (")
-            .replace(".(", " (")
-            .replace("​", "")  # strange char
-            .replace("...", "___")
-            .replace("u.a.", "unter anderem")
-            .replace("Fr.", "Fr")
-            .replace("Rp.", "Rp")
-            .replace("bzgl.", "bezüglich")
-            .replace("vs.", "versus")
-            .replace("inkl.", "inklusive")
-            .replace("v.a.", "vor allem")
-            .replace("bzw.", "beziehungsweise")
-            for k in kompetenz_text
-        ]
-        # find periods preceeded by numbers, sub by comma (german num sep)
-        kompetenz_text = [re.sub(r"(\d)\.", r"\1,", k) for k in kompetenz_text]
 
-        # separate into individual sub kompetenzen by the periods, works well
-        kompetenz_text = [k.strip(".").split(".") for k in kompetenz_text]
-
-        # put the dot back where it belongs
-        kompetenz_text = [[str(i) + "." for i in k] for k in kompetenz_text]
+        kompetenz_text = self.k_text_formatter(kompetenz_text)
 
         # build up Pandas dataframe
         row_rep = len(kompetenz_text)  # the info per row will get exploded out
@@ -242,7 +243,46 @@ class Parser:
         df = df.explode("k_text").reset_index(drop=True)
         return df
 
-    def polish_df(df):
+    def k_text_formatter(self, k_text) -> str:
+
+        kompetenz_text = k_text
+
+        # remove breaks and possible whitespaces
+        # as I split on periods, I try to remove excess ones
+        kompetenz_text = [
+            k.text.strip()
+            .replace("Die Schülerinnen und Schüler ...", "")
+            .replace("\n", "")
+            .replace("\t", "")
+            .replace("\r", "")
+            .replace("z.B.", "zum Beispiel")
+            .replace("z. B.", "zum Beispiel")
+            .replace(". (", " (")
+            .replace(".(", " (")
+            .replace("​", "")  # strange char
+            .replace("...", "___")
+            .replace("u.a.", "unter anderem")
+            .replace("Fr.", "Fr")
+            .replace("Rp.", "Rp")
+            .replace("bzgl.", "bezüglich")
+            .replace("vs.", "versus")
+            .replace("inkl.", "inklusive")
+            .replace("v.a.", "vor allem")
+            .replace("bzw.", "beziehungsweise")
+            .strip()
+            for k in kompetenz_text
+        ]
+        # find periods preceeded by numbers, sub by comma (german num sep)
+        kompetenz_text = [re.sub(r"(\d)\.", r"\1,", k) for k in kompetenz_text]
+
+        # separate into individual sub kompetenzen by the periods, works well
+        kompetenz_text = [k.strip(".").split(".") for k in kompetenz_text]
+
+        # put the dot back where it belongs
+        kompetenz_text = [[str(i) + "." for i in k] for k in kompetenz_text]
+        return kompetenz_text
+
+    def polish_df(self, df: pd.DataFrame) -> pd.DataFrame:
 
         df["str_criteria"] = df["k_text"].str.contains(
             "zeigen|stellen|lernen|nehmen|setzen|reflektieren|erkunden|machen|erzählen|erhalten|wissen|entwickeln|verfügen|sind bereit|sammeln|ordnen|erforschen|beschreiben|kennen|experimentieren|erfahren|entscheiden|lassen sich|suchen|erkennen|verwenden|können|Erweiterung|verstehen"
@@ -269,7 +309,6 @@ class Parser:
                 "k_text_x",
                 "k_text_y",
                 "str_criteria",
-                "Unnamed: 0",
                 "level_0",
                 "level_1",
             ]
@@ -292,5 +331,5 @@ class Parser:
 
 
 # print(get_k_details("https://sh.lehrplan.ch/index.php?code=a|1|11|6|3|1"))
-aaa = Parser()
+aaa = Parser("sh")
 # pprint.pprint(aaa.k_df_dict)
