@@ -5,6 +5,7 @@ import pandas as pd
 import mypy
 import pprint
 import json
+import numpy as np
 
 # from rich.progress import Progress
 
@@ -23,38 +24,46 @@ class Parser:
             raise Exception(
                 "No canton link could be found in the canton list with the provided acronym. Check your spelling!"
             )
-        self.get_ueber_k()
 
-        #        self.faecher = self.get_faecher(self.canton_url)
-        #
-        #        self.k_details_dict = self.dictapply(self.faecher, self.get_k_groups)
-        #
-        #        ##flatten the dictionary containing all the links
-        #        norm = pd.json_normalize(self.k_details_dict, sep="_")
-        #        self.k_details_dict = norm.to_dict(orient="records")[0]
-        #
-        #        ##apply the function 'combineaply' recursively to each lowest dict level
-        #        ##combineapply calls the df extraction func and combines all df's
-        #
-        #        self.k_df_dict = self.dictapply(self.k_details_dict, self.combineapply)
-        #
-        #        user_ids = []
-        #        frames = []
-        #
-        #        for user_id, d in self.k_df_dict.items():
-        #            user_ids.append(user_id)
-        #            frames.append(d)
-        #        final_frame = pd.concat(frames, keys=user_ids).reset_index()
-        #        polished_df = self.polish_df(final_frame)
-        #
-        #        polished_df.to_csv("lp_parse_export.csv", index=False)
-        #
-        #        print(polished_df)
-        test = self.get_k_details(
-            "https://sh.lehrplan.ch/index.php?code=a|5|0|1|3|2"
-        )
-        print(test)
-        test.to_csv("test.csv", index=False)
+        # try go get the überfachliche kompetenzen
+        try:
+            ueber_df = self.get_ueber_k()
+        except:
+            print("Could not get Überfachliche Kompetenzen")
+
+        # extract the url to each fach
+        self.faecher = self.get_faecher(self.canton_url)
+
+        # extract the url to the pages for each kompetenz group per fach
+        self.k_details_dict = self.dictapply(self.faecher, self.get_k_groups)
+
+        ##flatten the dictionary containing all the links
+        # this will make combining the df's much easier (no nesting)
+        norm = pd.json_normalize(self.k_details_dict, sep="_")
+        self.k_details_dict = norm.to_dict(orient="records")[0]
+
+        ##dictapply apples the func 'combineapply' recursively to each lowest dict level
+        ##works also with nested df's on different levels, but don't recommend
+        ##combineapply calls the df extraction func and combines all df's
+        self.k_df_dict = self.dictapply(self.k_details_dict, self.combineapply)
+
+        user_ids = []
+        frames = []
+        for user_id, d in self.k_df_dict.items():
+            user_ids.append(user_id)
+            frames.append(d)
+        final_frame = pd.concat(frames, keys=user_ids).reset_index()
+
+        polished_df = self.polish_df(final_frame)
+
+        try:
+            polished_df = pd.concat([ueber_df, polished_df])
+        except:
+            pass
+
+        polished_df.to_csv("lp_parse_export.csv", index=False)
+
+        print(polished_df)
 
     def get_ueber_k(self) -> pd.DataFrame:
         url = self.canton_url + "/" + "index.php?code=e|200|3"
@@ -62,19 +71,40 @@ class Parser:
         page = urlopen(req)
         soup = BeautifulSoup(page, features="lxml")
 
-        # menu = soup.find_all(class_="marginalie three columns alpha")
-        # [print(i.contents[0].contents[0].find('a').attrs.get('name')) for i in menu]
-        # [print(i.contents[0].text) for i in menu]
-        test = soup.find_all(class_="ek_absatz")
-        # [print(i.contents[0].contents[0].find('a').attrs.get('name')) for i in test]
-        # [print(i.text) for i in test]
-        ueberkomp = dict()
-        for i in test:
+        titels = []
+        titel = soup.find_all(class_="ek_titel")
+        [titels.append(i.contents[0].text) for i in titel]
+        titels.remove(titels[0])
+
+        detail = soup.find_all(class_="ek_absatz")
+        codes = []
+        subtitels = []
+        ueberkomp = []
+        komp_groups = []
+        for i in detail:
             key = i.contents[0].contents[0].find("a").attrs.get("name")
             if "11" in key:
                 utext = self.k_text_formatter(i)
-                ueberkomp[key] = utext
-        pprint.pprint(ueberkomp)
+                codes.append(key)
+                # flatten list with [0]
+                subtitels.append(utext[0][0])
+                ueberkomp.append(utext[1][0])
+                # get the number of groups there are
+                komp_groups.append(int(key[3]))
+
+        ngrps = max(komp_groups)
+        titels = np.repeat(titels, ngrps)
+
+        ueber_df = pd.DataFrame()
+        ueber_df["Fach"] = ["Überfachliche Kompetenzen"] * len(ueberkomp)
+        ueber_df["k_group"] = titels
+        ueber_df["k_subgroup"] = subtitels
+        ueber_df["k_text"] = ueberkomp
+
+        return ueber_df
+
+        # for key, value in ueberkomp.items():
+        # print(ueberkomp[key][1])
 
     #        if "Grundlagen" in list(faecher.keys()):
     #            del faecher["Grundlagen"]
