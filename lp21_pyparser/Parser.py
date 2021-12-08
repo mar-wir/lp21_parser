@@ -3,11 +3,10 @@ from urllib.request import Request, urlopen
 import re
 import pandas as pd
 import mypy
-import pprint
 import json
 import numpy as np
 
-# from rich.progress import Progress
+import _helper_func as _hf
 
 
 class Parser:
@@ -35,26 +34,25 @@ class Parser:
         self.faecher = self.get_faecher(self.canton_url)
 
         # extract the url to the pages for each kompetenz group per fach
-        self.k_details_dict = self.dictapply(self.faecher, self.get_k_groups)
+        self.k_details_dict = _hf.dictapply(self.faecher, self.get_k_groups)
 
         ##flatten the dictionary containing all the links
         # this will make combining the df's much easier (no nesting)
         norm = pd.json_normalize(self.k_details_dict, sep="_")
         self.k_details_dict = norm.to_dict(orient="records")[0]
 
-        ##dictapply apples the func 'combineapply' recursively to each lowest dict level
-        ##works also with nested df's on different levels, but don't recommend
-        ##combineapply calls the df extraction func and combines all df's
-        self.k_df_dict = self.dictapply(self.k_details_dict, self.combineapply)
+        ##applies the func 'combineapply_k_details' recursively to each lowest dict level
+        ##works also with nested df's with different levels, but don't recommend
+        ##combineapply calls the df extraction func and combines all df's on each level
+        self.k_df_dict = _hf.dictapply(
+            self.k_details_dict, self.combineapply_k_details
+        )
 
-        user_ids = []
-        frames = []
-        for user_id, d in self.k_df_dict.items():
-            user_ids.append(user_id)
-            frames.append(d)
-        final_frame = pd.concat(frames, keys=user_ids).reset_index()
+        # collect all the df's from the dict and combine
+        final_frame = _hf.extract_combine_df_from_dict(self.k_df_dict)
 
-        polished_df = self.polish_df(final_frame)
+        # rename cols, fix split kompetenzen if two entries instead one
+        polished_df = _hf.polish_df(final_frame)
 
         try:
             polished_df = pd.concat([ueber_df, polished_df])
@@ -65,6 +63,25 @@ class Parser:
 
         print(polished_df)
 
+    #########################################
+    #########################################
+
+    ##### Canton Link List
+    def get_canton_sites(self):
+        req = Request(self.main_site, headers=self.hdr)
+        page = urlopen(req)
+        soup = BeautifulSoup(page, features="lxml")
+        all_a = soup.find_all("a")
+        canton_links = []
+
+        for link in all_a:
+            l = link.get("href")
+            if type(l) != "NoneType":
+                canton_links.append(str(l).replace("http:", "https:"))
+        links = [k for k in canton_links if ".lehrplan.ch" in k]
+        return list(set(links))  # return unique entries
+
+    # Get Überfachliche Kompetenzen
     def get_ueber_k(self) -> pd.DataFrame:
         url = self.canton_url + "/" + "index.php?code=e|200|3"
         req = Request(url, headers=self.hdr)
@@ -84,59 +101,28 @@ class Parser:
         for i in detail:
             key = i.contents[0].contents[0].find("a").attrs.get("name")
             if "11" in key:
-                utext = self.k_text_formatter(i)
+                utext = _hf.k_text_formatter(i)
                 codes.append(key)
                 # flatten list with [0]
                 subtitels.append(utext[0][0])
-                ueberkomp.append(utext[1][0])
+                ueberkomp.append(utext[1])
                 # get the number of groups there are
                 komp_groups.append(int(key[3]))
 
         ngrps = max(komp_groups)
         titels = np.repeat(titels, ngrps)
 
+        # build up dataframe and explode out
         ueber_df = pd.DataFrame()
         ueber_df["Fach"] = ["Überfachliche Kompetenzen"] * len(ueberkomp)
+        ueber_df["Fach_Detail"] = ["NA"] * len(ueberkomp)
         ueber_df["k_group"] = titels
         ueber_df["k_subgroup"] = subtitels
         ueber_df["k_text"] = ueberkomp
 
+        ueber_df = ueber_df.explode("k_text").reset_index(drop=True)
+
         return ueber_df
-
-        # for key, value in ueberkomp.items():
-        # print(ueberkomp[key][1])
-
-    #        if "Grundlagen" in list(faecher.keys()):
-    #            del faecher["Grundlagen"]
-    #        return faecher
-
-    def w_dict_to_json(
-        self, dic: dict, filename: str = "unnamed_dict_export.json"
-    ) -> None:
-        with open(filename, "w", encoding="UTF-8") as fp:
-            json.dump(
-                dic,
-                fp,
-                sort_keys=True,
-                indent=4,
-                separators=(",", ": "),
-                ensure_ascii=False,
-            )
-
-    ##### Canton Link List
-    def get_canton_sites(self):
-        req = Request(self.main_site, headers=self.hdr)
-        page = urlopen(req)
-        soup = BeautifulSoup(page, features="lxml")
-        all_a = soup.find_all("a")
-        canton_links = []
-
-        for link in all_a:
-            l = link.get("href")
-            if type(l) != "NoneType":
-                canton_links.append(str(l).replace("http:", "https:"))
-        links = [k for k in canton_links if ".lehrplan.ch" in k]
-        return list(set(links))  # return unique entries
 
     ##### Fach Items
     def get_faecher(self, f_url: str) -> dict:
@@ -179,16 +165,7 @@ class Parser:
                 pass
         return komp_dict
 
-    # applies arbitrary function 'applyfunc' to values of nested dicts
-    def dictapply(self, basedict: dict, applyfunc, memdict: dict = dict()):
-        for k, v in basedict.items():
-            if isinstance(v, dict):
-                self.dictapply(v, applyfunc, basedict)
-            else:
-                basedict[k] = applyfunc(v)
-        return basedict
-
-    def combineapply(self, url_list: list) -> pd.DataFrame:
+    def combineapply_k_details(self, url_list: list) -> pd.DataFrame:
         outlist = [self.get_k_details(i) for i in url_list]
         return pd.concat(outlist)
 
@@ -254,7 +231,7 @@ class Parser:
             class_="eight columns komp_cell kompetenz_text"
         )
 
-        kompetenz_text = self.k_text_formatter(kompetenz_text)
+        kompetenz_text = _hf.k_text_formatter(kompetenz_text)
 
         # build up Pandas dataframe
         row_rep = len(kompetenz_text)  # the info per row will get exploded out
@@ -273,93 +250,5 @@ class Parser:
         df = df.explode("k_text").reset_index(drop=True)
         return df
 
-    def k_text_formatter(self, k_text) -> str:
 
-        kompetenz_text = k_text
-
-        # remove breaks and possible whitespaces
-        # as I split on periods, I try to remove excess ones
-        kompetenz_text = [
-            k.text.strip()
-            .replace("Die Schülerinnen und Schüler ...", "")
-            .replace("\n", "")
-            .replace("\t", "")
-            .replace("\r", "")
-            .replace("z.B.", "zum Beispiel")
-            .replace("z. B.", "zum Beispiel")
-            .replace(". (", " (")
-            .replace(".(", " (")
-            .replace("​", "")  # strange char
-            .replace("...", "___")
-            .replace("u.a.", "unter anderem")
-            .replace("Fr.", "Fr")
-            .replace("Rp.", "Rp")
-            .replace("bzgl.", "bezüglich")
-            .replace("vs.", "versus")
-            .replace("inkl.", "inklusive")
-            .replace("v.a.", "vor allem")
-            .replace("bzw.", "beziehungsweise")
-            .strip()
-            for k in kompetenz_text
-        ]
-        # find periods preceeded by numbers, sub by comma (german num sep)
-        kompetenz_text = [re.sub(r"(\d)\.", r"\1,", k) for k in kompetenz_text]
-
-        # separate into individual sub kompetenzen by the periods, works well
-        kompetenz_text = [k.strip(".").split(".") for k in kompetenz_text]
-
-        # put the dot back where it belongs
-        kompetenz_text = [[str(i) + "." for i in k] for k in kompetenz_text]
-        return kompetenz_text
-
-    def polish_df(self, df: pd.DataFrame) -> pd.DataFrame:
-
-        df["str_criteria"] = df["k_text"].str.contains(
-            "zeigen|stellen|lernen|nehmen|setzen|reflektieren|erkunden|machen|erzählen|erhalten|wissen|entwickeln|verfügen|sind bereit|sammeln|ordnen|erforschen|beschreiben|kennen|experimentieren|erfahren|entscheiden|lassen sich|suchen|erkennen|verwenden|können|Erweiterung|verstehen"
-        )
-
-        df["Index"] = df.index
-        onlyF_df = df.loc[df.str_criteria == False]
-        onlyF_df = onlyF_df[["Index", "k_text"]]
-        onlyT_df = df.loc[df.str_criteria == True]
-        onlyF_df["Index"] = onlyF_df["Index"] - 1
-        result = (
-            pd.merge(onlyT_df, onlyF_df, how="left", on=["Index"])
-            .reset_index()
-            .fillna("")
-        )
-        result["k_text"] = result["k_text_x"] + " " + result["k_text_y"]
-        result[["Fach", "Fach_Detail"]] = result["level_0"].str.split(
-            "_", 1, expand=True
-        )
-        result = result.drop(
-            columns=[
-                "index",
-                "Index",
-                "k_text_x",
-                "k_text_y",
-                "str_criteria",
-                "level_0",
-                "level_1",
-            ]
-        ).fillna("NA")
-        result = result[
-            [
-                "Fach",
-                "Fach_Detail",
-                "k_group",
-                "k_subgroup",
-                "k_subgroup_code",
-                "k_code",
-                "zyklus",
-                "k_text_code",
-                "qverweis",
-                "k_text",
-            ]
-        ]
-        return result
-
-
-# print(get_k_details("https://sh.lehrplan.ch/index.php?code=a|1|11|6|3|1"))
 aaa = Parser("sh")
-# pprint.pprint(aaa.k_df_dict)
