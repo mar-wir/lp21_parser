@@ -50,17 +50,72 @@ cd lp21_parser/dist/
 By general rule, clone repo or pull latest changes before reinstalling. In the `dist` folder inside the repository:
 
 ```bash
-sudo pip3 install lp21_parser*
+sudo pip3 install lp21_pyparser*
 ```
 
 - IF the package has already been installed previously and one wishes to update:
 
 ```bash
-sudo pip3 install --upgrade --force-reinstall lp21_parser*
+sudo pip3 install --upgrade --force-reinstall lp21_pyparser*
+```
+
+### Alternative Install/Usage
+
+Instead of installing the packga via pip, just clone this repo and launch the parser invoking the script directly (see below). This means you either install all dependencies manually or use a virtualenv. I recommend `poetry`, as I already set the environment up via that approach. 
+
+Clone the repo:
+```bash
+git clone git@github.com:Seneketh/lp21_parser.git
+```
+
+Change directory into the repo:
+```bash
+cd lp21_parser/
+```
+
+Initialize the virtual environment. Note: You will need a compatible python runtime and poetry. Check the `pyproject.toml` for version requirements. For the poetry installation see their website directly or below, a quick guide.
+```bash
+poetry shell
+```
+
+Install all dependencies into the virtualenv:
+```bash
+poetry install
+```
+
+#### Poetry installation quick-guide:
+
+For MacOS, Linux, and WSL:
+
+```bash
+curl -sSL https://raw.githubusercontent.com/python-poetry/poetry/master/get-poetry.py | python3
+```
+
+To apply changes for your current shell session, run
+
+```bash
+source $HOME/.poetry/env
+```
+
+You may add this to the auto-run shell script like .bashrc or .zshrc if Poetry doesn’t appear in a new shell session:
+
+```bash
+export PATH="$HOME/.poetry/bin:$PATH"
 ```
 
 ## Un-Install
 
+- If you installed the parser as package:
 ```bash
 sudo pip3 uninstall lp21_parser*
+```
+
+- If you just cloned the repo, delete the directory. Don´t forget to remove the virtual environment created by poetry with `poetry env remove`.
+
+## Usage
+
+2.  Make the call:
+
+```bash
+python3 -c 'from prognolite_web_exporter import Configuration_Handler;Configuration_Handler.implementation_selector("./config.txt","service2")'
 ```
