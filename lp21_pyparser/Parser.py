@@ -5,63 +5,98 @@ import pandas as pd
 import mypy
 import json
 import numpy as np
+import sys
+from rich.console import Console
 
-import _helper_func as _hf
+if __name__ == "__main__":
+    import _helper_func as _hf
+else:
+    from lp21_pyparser import _helper_func as _hf
 
 
-class Parser:
+class LP_Parser:
     def __init__(self, canton_of_choice: str = "sh"):
-
-        self.canton_of_choice = canton_of_choice
-        self.hdr = {"User-Agent": "Mozilla/5.0"}
-        self.main_site = "https://www.lehrplan21.ch/"
-        self.canton_links = self.get_canton_sites()
-        self.canton_url = [
-            s for s in self.canton_links if self.canton_of_choice in s
-        ][0]
-        if self.canton_url == None:
-            raise Exception(
-                "No canton link could be found in the canton list with the provided acronym. Check your spelling!"
-            )
-
-        # try go get the überfachliche kompetenzen
-        try:
-            ueber_df = self.get_ueber_k()
-        except:
-            print("Could not get Überfachliche Kompetenzen")
-
-        # extract the url to each fach
-        self.faecher = self.get_faecher(self.canton_url)
-
-        # extract the url to the pages for each kompetenz group per fach
-        self.k_details_dict = _hf.dictapply(self.faecher, self.get_k_groups)
-
-        ##flatten the dictionary containing all the links
-        # this will make combining the df's much easier (no nesting)
-        norm = pd.json_normalize(self.k_details_dict, sep="_")
-        self.k_details_dict = norm.to_dict(orient="records")[0]
-
-        ##applies the func 'combineapply_k_details' recursively to each lowest dict level
-        ##works also with nested df's with different levels, but don't recommend
-        ##combineapply calls the df extraction func and combines all df's on each level
-        self.k_df_dict = _hf.dictapply(
-            self.k_details_dict, self.combineapply_k_details
+        self.console = Console()
+        self.console.print(
+            "\nWelcome to LP21 Pyparser!\n", style="bold underline"
+        )
+        self.console.print(
+            "You chose the following [bold]Canton[/]: "
+            + canton_of_choice
+            + "\n"
         )
 
-        # collect all the df's from the dict and combine
-        final_frame = _hf.extract_combine_df_from_dict(self.k_df_dict)
+        with self.console.status(
+            "[bold green]Working...", spinner="toggle10"
+        ) as status:
 
-        # rename cols, fix split kompetenzen if two entries instead one
-        polished_df = _hf.polish_df(final_frame)
+            self.canton_of_choice = canton_of_choice
+            self.hdr = {"User-Agent": "Mozilla/5.0"}
+            self.main_site = "https://www.lehrplan21.ch/"
+            self.canton_links = self.get_canton_sites()
+            self.canton_url = [
+                s for s in self.canton_links if self.canton_of_choice in s
+            ][0]
+            if self.canton_url == None:
+                raise Exception(
+                    "No canton link could be found in the canton list with the provided acronym. Check your spelling!"
+                )
 
-        try:
-            polished_df = pd.concat([ueber_df, polished_df])
-        except:
-            pass
+            # try go get the überfachliche kompetenzen
+            self.console.log(
+                "Attempting to get the Überfachliche Kompetenzen. This might not work for some Cantons."
+            )
+            try:
+                ueber_df = self.get_ueber_k()
+                console.log("Überfachliche Kompetenzen found!")
+            except:
+                self.console.log("Could not get Überfachliche Kompetenzen")
 
-        polished_df.to_csv("lp_parse_export.csv", index=False)
+            # extract the url to each fach
+            self.console.log("Extracting the URLs for each Fach...")
+            self.faecher = self.get_faecher(self.canton_url)
+            self.console.print(self.faecher)
 
-        print(polished_df)
+            self.console.log(
+                "Extracting the URLs for each sub page per Fach..."
+            )
+            # extract the url to the pages for each kompetenz group per fach
+            self.k_details_dict = _hf.dictapply(
+                self.faecher, self.get_k_groups
+            )
+
+            ##flatten the dictionary containing all the links
+            # this will make combining the df's much easier (no nesting)
+            norm = pd.json_normalize(self.k_details_dict, sep="_")
+            self.k_details_dict = norm.to_dict(orient="records")[0]
+
+            ##applies the func 'combineapply_k_details' recursively to each lowest dict level
+            ##works also with nested df's with different levels, but don't recommend
+            ##combineapply calls the df extraction func and combines all df's on each level
+            self.console.log(
+                "Extracting low level info (the actual Kompetenzen)..."
+            )
+            self.k_df_dict = _hf.dictapply(
+                self.k_details_dict, self.combineapply_k_details
+            )
+
+            self.console.log("Combining all the Kompetenzen data frames...")
+            # collect all the df's from the dict and combine
+            final_frame = _hf.extract_combine_df_from_dict(self.k_df_dict)
+
+            self.console.log("Making string corrections...")
+            # rename cols, fix split kompetenzen if two entries instead one
+            polished_df = _hf.polish_df(final_frame)
+
+            try:
+                polished_df = pd.concat([ueber_df, polished_df])
+            except:
+                pass
+
+            console.log("Saving to csv")
+            polished_df.to_csv("lp_parse_export.csv", index=False)
+
+            console.print(polished_df)
 
     #########################################
     #########################################
@@ -158,7 +193,6 @@ class Parser:
         for i in menu:
             try:
                 if "Die Schülerinnen und Schüler" in i.string:
-                    # komp_dict[str(i.string)] = self.canton_url + '/' + i.get('href')
                     komp_dict.append(self.canton_url + "/" + i.get("href"))
 
             except:
@@ -171,6 +205,7 @@ class Parser:
 
     ##### get all details for each kompetenz header
     def get_k_details(self, k_link: str) -> pd.DataFrame:
+        self.console.log("Extracting data frame for: " + k_link)
         req = Request(k_link, headers=self.hdr)
         page = urlopen(req)
         soup = BeautifulSoup(page, features="lxml")
@@ -251,4 +286,10 @@ class Parser:
         return df
 
 
-aaa = Parser("sh")
+# sys arg should be the canton abbreviation
+if __name__ == "__main__":
+    print("Module called from a CLI.\n")
+    if len(sys.argv) > 1:
+        obj = LP_Parser(sys.argv[1])
+    else:
+        obj = LP_Parser()
