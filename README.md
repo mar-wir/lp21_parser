@@ -1,3 +1,13 @@
+
+```mermaid
+graph TD;
+A-->B;
+A-->C;
+B-->D;
+C-->D;
+
+```
+
 # Lehrplan 21 Kompetenzen Parser
 
 ## TL;DR:
