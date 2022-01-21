@@ -17,14 +17,8 @@ else:
 class LP_Parser:
     def __init__(self, canton_of_choice: str = "sh"):
         self.console = Console()
-        self.console.print(
-            "\nWelcome to LP21 Pyparser!\n", style="bold underline"
-        )
-        self.console.print(
-            "You chose the following [bold]Canton[/]: "
-            + canton_of_choice
-            + "\n"
-        )
+
+        _hf.print_greeting(canton_of_choice)
 
         with self.console.status(
             "[bold green]Working...", spinner="toggle10"
@@ -46,11 +40,12 @@ class LP_Parser:
             self.console.log(
                 "Attempting to get the Überfachliche Kompetenzen. This might not work for some Cantons."
             )
+
             try:
                 ueber_df = self.get_ueber_k()
-                console.log("Überfachliche Kompetenzen found!")
+                self.console.log("Überfachliche Kompetenzen found!")
             except:
-                self.console.log("Could not get Überfachliche Kompetenzen")
+                self.console.log("Could not get Überfachliche Kompetenzen. Webpage is structured quited differetnly for this canton. Luckily, there are not many of those...")
 
             # extract the url to each fach
             self.console.log("Extracting the URLs for each Fach...")
@@ -93,10 +88,10 @@ class LP_Parser:
             except:
                 pass
 
-            console.log("Saving to csv")
-            polished_df.to_csv("lp_parse_export.csv", index=False)
+            self.console.log("Saving to csv")
+            polished_df.to_csv("lp_parse_export_" + canton_of_choice + ".csv", index=False)
 
-            console.print(polished_df)
+            self.console.print(polished_df)
 
     #########################################
     #########################################
@@ -127,6 +122,8 @@ class LP_Parser:
         titel = soup.find_all(class_="ek_titel")
         [titels.append(i.contents[0].text) for i in titel]
         titels.remove(titels[0])
+        if 'Einleitung' in titels:
+            titels.remove('Einleitung')
 
         detail = soup.find_all(class_="ek_absatz")
         codes = []
@@ -146,7 +143,6 @@ class LP_Parser:
 
         ngrps = max(komp_groups)
         titels = np.repeat(titels, ngrps)
-
         # build up dataframe and explode out
         ueber_df = pd.DataFrame()
         ueber_df["Fach"] = ["Überfachliche Kompetenzen"] * len(ueberkomp)
@@ -167,6 +163,10 @@ class LP_Parser:
 
         menu = soup.find_all(class_="dreieck_mit")
 
+
+        if len(menu) > 1 and 'Allgemeine Hinweise und Bestimmungen (AHB)' == menu[0].contents[0].string:
+            menu.remove(menu[0])
+
         faecher = dict()
         for i in menu:
             f_link = self.canton_url + "/" + i.contents[0].get("href")
@@ -176,6 +176,7 @@ class LP_Parser:
                 faecher[str(i.contents[0].string)] = level_test
             else:
                 faecher[str(i.contents[0].string)] = f_link
+
 
         if "Grundlagen" in list(faecher.keys()):
             del faecher["Grundlagen"]

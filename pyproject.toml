@@ -18,6 +18,8 @@ pytest = "^5.2"
 pre-commit = "^2.15.0"
 black = {version = "^21.11b1", allow-prereleases = true}
 mypy = "^0.910"
+jedi = "^0.18.1"
+pynvim = "^0.4.3"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]

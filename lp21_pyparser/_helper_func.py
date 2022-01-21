@@ -25,9 +25,9 @@ def w_dict_to_json(
             ensure_ascii=False,
         )
 
-
 # applies arbitrary function 'applyfunc' to values of nested dicts
 def dictapply(basedict: dict, applyfunc, memdict: dict = dict()):
+
     for k, v in basedict.items():
         if isinstance(v, dict):
             dictapply(v, applyfunc, basedict)
@@ -132,3 +132,19 @@ def polish_df(df: pd.DataFrame) -> pd.DataFrame:
         ]
     ]
     return result
+
+def print_greeting(coc):
+    MARKDOWN = """
+# LP 21 Parser
+
+#### Welcome to the Lehrplan 21 Parser!
+#### This process takes about 5 to 10 Minutes, please be patient!
+#### You are parsing the Kompetenzen for the Canton: **{}**
+***
+""".format(coc)
+    from rich.console import Console
+    from rich.markdown import Markdown
+
+    console = Console()
+    md = Markdown(MARKDOWN)
+    console.print(md)
