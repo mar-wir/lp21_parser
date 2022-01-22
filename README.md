@@ -35,7 +35,7 @@ Enabling live-tracking of which Kompetenz has been included in a teachers' cours
 
 I already made exports for several Cantons. If there is interest, I can export others. Below, instruction on how export the Kompetenzen on your own.
 
-**Downloads here**
+:sparkles: [**Downloads here**](https://github.com/Seneketh/lp21_parser/releases/tag/v0.5.0) :sparkles:
 
 # DIY for devs
 
