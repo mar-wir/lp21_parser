@@ -6,7 +6,7 @@
 
 - **Target users:** Any educational institution which operates under the Swiss educational system and 'Lehrplan 21', but is not part of the public Swiss school network, for example Swiss Schools in foreign countries.
 - **Why?:** Lehrplan 21 is based on over 3000, cross-referenced skills, officially listed here: https://www.lehrplan21.ch/ . The website does not allow for a database export of those skills. Centralized planning of the coursework is hindered because of this. The current repo parses all those skills and exports them as csv file, thus enabling those organizations in their planning.
-- **How?:** Download the Kompetenzen export for your Kanton here. The csv file can be opened with a spreadsheet software (e.g. LibreOffice Calc or MS Excel) and skills, and cross references be searched and marked by teachers. If shared via google spreadsheets, a centralized planning is possible. The csv file can also be used as basis for a database (e.g. mySQL) and paired with student information. Thus, the DB would hold real-time information on which student holds which skills, thus, making fine-grained course-planning attainable.
+- **How?:** Download the Kompetenzen export for your Kanton [here](https://github.com/Seneketh/lp21_parser/releases/tag/v0.5.0). The csv file can be opened with a spreadsheet software (e.g. LibreOffice Calc or MS Excel) and skills, and cross references be searched and marked by teachers. If shared via google spreadsheets, a centralized planning is possible. The csv file can also be used as basis for a database (e.g. mySQL) and paired with student information. Thus, the DB would hold real-time information on which student holds which skills, thus, making fine-grained course-planning attainable.
 
 * * *
 
@@ -35,7 +35,7 @@ Enabling live-tracking of which Kompetenz has been included in a teachers' cours
 
 I already made exports for several Cantons. If there is interest, I can export others. Below, instruction on how export the Kompetenzen on your own.
 
-:sparkles: [**Downloads here**](https://github.com/Seneketh/lp21_parser/releases/tag/v0.5.0) :sparkles:
+### :sparkles: [**Downloads here**](https://github.com/Seneketh/lp21_parser/releases/tag/v0.5.0) :sparkles:
 
 # DIY for devs
 
