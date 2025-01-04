@@ -31,11 +31,13 @@ Enabling live-tracking of which Kompetenz has been included in a teachers' cours
 - Use the csv file via a spreadsheet software (MS Excel, Google Sheets, OpenOffice Calc). Used Kompetenzen can be marked manually by teachers. If done collaboratively on the cloud, this already serves its purpose for the planning.
 - Include the csv file in a wider database (mysql, sql lite). Combine the Kompetenzen information with student information and track which student has covered which Kompetenzen. This solution is more involved, but allows for personalized education. This approach furthermore requires the development of a web-app solution (for instance, Python Django/Flask or PHP Laravel/CakePHP). Naturally, a server is required to host those web-apps.
 
-### Download of the Kompetenzen
+~### Download of the Kompetenzen~
 
-I already made exports for several Cantons. If there is interest, I can export others. Below, instruction on how export the Kompetenzen on your own.
+~I already made exports for several Cantons. If there is interest, I can export others. Below, instruction on how export the Kompetenzen on your own.~
 
-### :sparkles: [**Downloads here**](https://github.com/Seneketh/lp21_parser/releases/tag/v0.5.0) :sparkles:
+~### :sparkles: **Downloads here** :sparkles:~
+
+I got contacted by the Geschäftsstelle der Bildungsdirektorenkonferenz Zentralschweiz: The data is under copyright as per https://v-fe.lehrplan.ch/impressum.php . I cannot host this data anymore unfortunately. Apparently, there is a API available. Please contact info@lehrplan.ch for more information.
 
 # DIY for devs
 
