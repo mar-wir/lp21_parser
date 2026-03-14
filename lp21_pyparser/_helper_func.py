@@ -104,7 +104,7 @@ def polish_df(df: pd.DataFrame) -> pd.DataFrame:
     )
     result["k_text"] = result["k_text_x"] + " " + result["k_text_y"]
     result[["Fach", "Fach_Detail"]] = result["level_0"].str.split(
-        "_", 1, expand=True
+        pat="_", n=1, expand=True
     )
     result = result.drop(
         columns=[
